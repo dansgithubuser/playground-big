@@ -4,7 +4,7 @@ FROM nvcr.io/nvidia/pytorch:20.12-py3
 # Install linux packages
 RUN apt update && apt install -y zip screen libgl1-mesa-glx
 
-RUN apt-get install vim
+RUN apt-get -y install vim
 
 # Install python dependencies
 RUN python -m pip install --upgrade pip
@@ -17,6 +17,7 @@ WORKDIR /usr/src/app
 
 # Copy contents
 COPY . /usr/src/app
+COPY ./crowdhuman_yolov5m.pt /usr/src/app
 
 # Copy weights
 #RUN python3 -c "from models import *; \
@@ -24,6 +25,7 @@ COPY . /usr/src/app
 #attempt_download('weights/yolov5m.pt'); \
 #attempt_download('weights/yolov5l.pt')"
 
+RUN bash
 
 # ---------------------------------------------------  Extras Below  ---------------------------------------------------
 
