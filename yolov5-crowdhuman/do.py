@@ -15,6 +15,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--setup', action='store_true')
 parser.add_argument('--test-basic', action='store_true', help='detect heads in data/images')
 parser.add_argument('--detect', metavar='path', help='detect heads in folder containing images or videos')
+parser.add_argument('--crop-video', metavar='path', help='crop video to just the face')
 args = parser.parse_args()
 
 #===== consts =====#
@@ -119,3 +120,6 @@ if args.test_basic:
 
 if args.detect:
     invoke_in_venv(f'python3 detect.py --weights crowdhuman_yolov5m.pt --source {args.detect} --heads --view-img')
+
+if args.crop_video:
+    invoke_in_venv(f'python3 detect.py --weights crowdhuman_yolov5m.pt --source {args.crop_video} --crop-biggest-head')

@@ -56,6 +56,10 @@ def detect(save_img=False):
     names = model.module.names if hasattr(model, 'module') else model.names
     colors = [[random.randint(0, 255) for _ in range(3)] for _ in names]
 
+    # crop biggest head
+    if opt.crop_biggest_head:
+        biggest_heads = []
+
     # Run inference
     if device.type != 'cpu':
         model(torch.zeros(1, 3, imgsz, imgsz).to(device).type_as(next(model.parameters())))  # run once
@@ -81,6 +85,7 @@ def detect(save_img=False):
 
         # Process detections
         for i, det in enumerate(pred):  # detections per image
+            heads = []
             if webcam:  # batch_size >= 1
                 p, s, im0, frame = path[i], '%g: ' % i, im0s[i].copy(), dataset.count
             else:
@@ -102,6 +107,9 @@ def detect(save_img=False):
 
                 # Write results
                 for *xyxy, conf, cls in reversed(det):
+                    if names[int(cls)] == 'head':
+                        heads.append(([int(i) for i in xyxy], float(conf), names[int(cls)]))
+
                     if save_txt:  # Write to file
                         xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
                         line = (cls, *xywh, conf) if opt.save_conf else (cls, *xywh)  # label format
@@ -126,6 +134,21 @@ def detect(save_img=False):
                 cv2.imshow(str(p), im0)
                 cv2.waitKey(0)  # 1 millisecond
 
+            # crop biggest head
+            if opt.crop_biggest_head and heads:
+                def select_head(heads):
+                    result = None
+                    value_max = 0
+                    for i, ((xi, yi, xf, yf), conf, cls) in enumerate(heads):
+                        value = (xf - xi) * (yf - yi) * conf
+                        if value > value_max:
+                            result = i
+                    return result
+                head_i = select_head(heads)
+                if head_i != None:
+                    xi, yi, xf, yf = heads[head_i][0]
+                    biggest_heads.append(im0s[yi:yf, xi:xf])
+
             # Save results (image with detections)
             if save_img:
                 if dataset.mode == 'image':
@@ -146,6 +169,24 @@ def detect(save_img=False):
     if save_txt or save_img:
         s = f"\n{len(list(save_dir.glob('labels/*.txt')))} labels saved to {save_dir / 'labels'}" if save_txt else ''
         print(f"Results saved to {save_dir}{s}")
+
+    if opt.crop_biggest_head:
+        h = max([i.shape[0] for i in biggest_heads])
+        w = max([i.shape[1] for i in biggest_heads])
+        for i in range(len(biggest_heads)):
+            biggest_heads[i] = cv2.copyMakeBorder(
+                biggest_heads[i],
+                0,
+                h - biggest_heads[i].shape[0],
+                0,
+                w - biggest_heads[i].shape[1],
+                cv2.BORDER_CONSTANT,
+                0,
+            )
+        fps = vid_cap.get(cv2.CAP_PROP_FPS)
+        vid_writer = cv2.VideoWriter('cropped.mp4', cv2.VideoWriter_fourcc(*'mp4v'), 30, (w, h))
+        for i in biggest_heads:
+            vid_writer.write(i)
 
     print(f'Done. ({time.time() - t0:.3f}s)')
 
@@ -170,6 +211,7 @@ if __name__ == '__main__':
     parser.add_argument('--exist-ok', action='store_true', help='existing project/name ok, do not increment')
     parser.add_argument('--person', action='store_true', help='displays only person')
     parser.add_argument('--heads', action='store_true', help='displays only person')
+    parser.add_argument('--crop-biggest-head', action='store_true', help='writes a new video of biggest detected head')
     opt = parser.parse_args()
     print(opt)
     check_requirements()
